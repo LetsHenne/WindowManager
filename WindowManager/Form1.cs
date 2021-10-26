@@ -14,9 +14,6 @@ namespace WindowManager
 {
     public partial class MainWindow : Form
     {
-        [DllImport("user32.dll")]
-        private static extern bool ShowWindowAsync(IntPtr hWnd, int nCmdShow);
-
         private BackgroundWorker backgroundWorker;
         private bool backgroundWorkerRunningState;
         private string runningStateImgLocationError;
@@ -27,6 +24,7 @@ namespace WindowManager
         private bool mouseDown;
         private Button lastButton;
         private List<string> logStrings;
+        private List<Rule> rules;
         
         public MainWindow()
         {
@@ -38,13 +36,17 @@ namespace WindowManager
 
         private void LoadSettings()
         {
-            this.runningStateImgLocationError = "C:\\Users\\Henrik\\source\\repos\\WindowManager\\WindowManager\\bin\\error.png";
-            this.runningStateImgLocationRunning = "C:\\Users\\Henrik\\source\\repos\\WindowManager\\WindowManager\\bin\\running.png";
-            this.runningStateImgLocationPause = "C:\\Users\\Henrik\\source\\repos\\WindowManager\\WindowManager\\bin\\pause.png";
+            this.runningStateImgLocationError = "error.png";
+            this.runningStateImgLocationRunning = "running.png";
+            this.runningStateImgLocationPause = "pause.png";
             this.logStrings = new();
             this.logStrings.Add(DateTime.Now + ": Programm started");
             this.lastButton = this.btnRules;
             this.OpenPage(this.lastButton.Name);
+
+            this.rules = new();            
+            Process process = Process.GetProcessById(32452);
+            this.rules.Add(new(process, WindowShowStyle.Hide, process, WindowShowStyle.Show, 0));
         }
 
 
@@ -84,15 +86,16 @@ namespace WindowManager
             this.backgroundWorker.RunWorkerAsync();
             this.imgRunningState.ImageLocation = this.runningStateImgLocationRunning;
         }
-        private void BackgroundWorker_DoWork(object sender, DoWorkEventArgs e)
+        private async void BackgroundWorker_DoWork(object sender, DoWorkEventArgs e)
         {
             while (this.backgroundWorkerRunningState)
             {
-                foreach (Process p in from Process p in Process.GetProcesses()
-                                      where p.ProcessName.ToLower().Contains("overwolf") && p.MainWindowHandle != IntPtr.Zero && (p.MainWindowTitle.ToLower().Contains("buff app") || p.MainWindowTitle.ToLower().Contains("buff app - endgame"))
-                                      select p)
+                foreach(Rule rule in this.rules)
                 {
-                    ShowWindowAsync(p.MainWindowHandle, (int)WindowShowStyle.Hide);
+                    if (rule.TestIfRuleAplies())
+                    {
+                        await rule.ExecuteRule();
+                    }
                 }
                 System.Threading.Thread.Sleep(500);
             }
